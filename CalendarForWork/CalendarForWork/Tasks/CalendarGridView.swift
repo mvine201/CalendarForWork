@@ -9,6 +9,158 @@ enum CalendarDisplayMode {
     case month
 }
 
+final class CalendarGridHeaderView: UIView {
+    var visibleDate = Date() {
+        didSet { setNeedsDisplay() }
+    }
+
+    var displayMode: CalendarDisplayMode = .week {
+        didSet {
+            invalidateIntrinsicContentSize()
+            setNeedsDisplay()
+        }
+    }
+
+    var availableWidth: CGFloat = 0 {
+        didSet { setNeedsDisplay() }
+    }
+
+    private var calendar: Calendar = {
+        var calendar = Calendar.current
+        calendar.firstWeekday = 2
+        return calendar
+    }()
+
+    private let timeColumnWidth: CGFloat = 40
+    private let weekHeaderHeight: CGFloat = 48
+    private let monthHeaderHeight: CGFloat = 38
+
+    override var intrinsicContentSize: CGSize {
+        let height = displayMode == .week ? weekHeaderHeight : monthHeaderHeight
+        return CGSize(width: resolvedWidth, height: height)
+    }
+
+    private var resolvedWidth: CGFloat {
+        availableWidth > 0 ? availableWidth : 320
+    }
+
+    private var weekDayWidth: CGFloat {
+        (resolvedWidth - timeColumnWidth) / 7
+    }
+
+    private var monthDayWidth: CGFloat {
+        resolvedWidth / 7
+    }
+
+    private var weekDates: [Date] {
+        let start = startOfWeek(for: visibleDate)
+        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        configure()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        configure()
+    }
+
+    private func configure() {
+        backgroundColor = AppTheme.Colors.card
+        isOpaque = true
+    }
+
+    override func draw(_ rect: CGRect) {
+        AppTheme.Colors.card.setFill()
+        UIBezierPath(rect: rect).fill()
+
+        switch displayMode {
+        case .week:
+            drawWeekHeader()
+        case .month:
+            drawMonthHeader()
+        }
+
+        AppTheme.Colors.navy.setFill()
+        UIBezierPath(rect: CGRect(x: 0, y: bounds.maxY - 3, width: bounds.width, height: 3)).fill()
+    }
+
+    private func drawWeekHeader() {
+        let paragraph = centeredParagraph()
+        let weekdayAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 11, weight: .bold),
+            .foregroundColor: AppTheme.Colors.textSecondary,
+            .paragraphStyle: paragraph
+        ]
+        let dayAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 16, weight: .bold),
+            .foregroundColor: AppTheme.Colors.navy,
+            .paragraphStyle: paragraph
+        ]
+
+        for (index, date) in weekDates.enumerated() {
+            let x = timeColumnWidth + CGFloat(index) * weekDayWidth
+            let frame = CGRect(x: x, y: 0, width: weekDayWidth, height: weekHeaderHeight)
+
+            if calendar.isDateInToday(date) {
+                AppTheme.Colors.amberSoft.setFill()
+                UIBezierPath(rect: frame).fill()
+            }
+
+            weekdayTitle(for: date).draw(in: CGRect(x: frame.minX, y: 7, width: frame.width, height: 15), withAttributes: weekdayAttributes)
+            "\(calendar.component(.day, from: date))".draw(in: CGRect(x: frame.minX, y: 23, width: frame.width, height: 20), withAttributes: dayAttributes)
+        }
+    }
+
+    private func drawMonthHeader() {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 12, weight: .bold),
+            .foregroundColor: AppTheme.Colors.navy,
+            .paragraphStyle: centeredParagraph()
+        ]
+        let titles = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
+
+        for (index, title) in titles.enumerated() {
+            title.draw(
+                in: CGRect(x: CGFloat(index) * monthDayWidth, y: 10, width: monthDayWidth, height: 18),
+                withAttributes: attributes
+            )
+        }
+    }
+
+    private func centeredParagraph() -> NSMutableParagraphStyle {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        return paragraph
+    }
+
+    private func startOfWeek(for date: Date) -> Date {
+        let startOfDay = calendar.startOfDay(for: date)
+        let weekday = calendar.component(.weekday, from: startOfDay)
+        let daysFromMonday = (weekday + 5) % 7
+        return calendar.date(byAdding: .day, value: -daysFromMonday, to: startOfDay) ?? startOfDay
+    }
+
+    private func weekdayIndex(for date: Date) -> Int {
+        let weekday = calendar.component(.weekday, from: date)
+        return (weekday + 5) % 7
+    }
+
+    private func weekdayTitle(for date: Date) -> String {
+        switch weekdayIndex(for: date) {
+        case 0: return "T2"
+        case 1: return "T3"
+        case 2: return "T4"
+        case 3: return "T5"
+        case 4: return "T6"
+        case 5: return "T7"
+        default: return "CN"
+        }
+    }
+}
+
 final class CalendarGridView: UIView {
     weak var delegate: CalendarGridViewDelegate?
 
@@ -35,9 +187,7 @@ final class CalendarGridView: UIView {
     }()
 
     private let timeColumnWidth: CGFloat = 40
-    private let headerHeight: CGFloat = 48
     private let hourRowHeight: CGFloat = 96
-    private let monthHeaderHeight: CGFloat = 38
     private let monthRowHeight: CGFloat = 148
     private let orderedWeekHours = Array(5...23) + Array(0...4)
     private var taskFrames: [(task: TaskDTO, frame: CGRect)] = []
@@ -45,9 +195,9 @@ final class CalendarGridView: UIView {
     override var intrinsicContentSize: CGSize {
         switch displayMode {
         case .week:
-            return CGSize(width: resolvedWidth, height: headerHeight + 24 * hourRowHeight)
+            return CGSize(width: resolvedWidth, height: 24 * hourRowHeight)
         case .month:
-            return CGSize(width: resolvedWidth, height: monthHeaderHeight + CGFloat(monthRowCount) * monthRowHeight)
+            return CGSize(width: resolvedWidth, height: CGFloat(monthRowCount) * monthRowHeight)
         }
     }
 
@@ -111,44 +261,20 @@ final class CalendarGridView: UIView {
     }
 
     private func drawWeek(_ context: CGContext) {
-        drawWeekHeaders()
+        drawWeekHourLabels()
         drawWeekGrid(context)
         drawWeekTasks()
     }
 
-    private func drawWeekHeaders() {
-        let paragraph = centeredParagraph()
-        let weekdayAttributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 11, weight: .bold),
-            .foregroundColor: AppTheme.Colors.textSecondary,
-            .paragraphStyle: paragraph
-        ]
-        let dayAttributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 16, weight: .bold),
-            .foregroundColor: AppTheme.Colors.navy,
-            .paragraphStyle: paragraph
-        ]
+    private func drawWeekHourLabels() {
         let hourAttributes: [NSAttributedString.Key: Any] = [
             .font: UIFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium),
             .foregroundColor: AppTheme.Colors.textSecondary,
-            .paragraphStyle: paragraph
+            .paragraphStyle: centeredParagraph()
         ]
 
-        for (index, date) in weekDates.enumerated() {
-            let x = timeColumnWidth + CGFloat(index) * weekDayWidth
-            let frame = CGRect(x: x, y: 0, width: weekDayWidth, height: headerHeight)
-
-            if calendar.isDateInToday(date) {
-                AppTheme.Colors.amberSoft.setFill()
-                UIBezierPath(rect: CGRect(x: x, y: 0, width: weekDayWidth, height: bounds.height)).fill()
-            }
-
-            weekdayTitle(for: date).draw(in: CGRect(x: frame.minX, y: 7, width: frame.width, height: 15), withAttributes: weekdayAttributes)
-            "\(calendar.component(.day, from: date))".draw(in: CGRect(x: frame.minX, y: 23, width: frame.width, height: 20), withAttributes: dayAttributes)
-        }
-
         for (index, hour) in orderedWeekHours.enumerated() {
-            let y = headerHeight + CGFloat(index) * hourRowHeight
+            let y = CGFloat(index) * hourRowHeight
             "\(String(format: "%02d", hour)):00".draw(
                 in: CGRect(x: 0, y: y + 8, width: timeColumnWidth - 4, height: 18),
                 withAttributes: hourAttributes
@@ -157,6 +283,12 @@ final class CalendarGridView: UIView {
     }
 
     private func drawWeekGrid(_ context: CGContext) {
+        for (index, date) in weekDates.enumerated() where calendar.isDateInToday(date) {
+            let x = timeColumnWidth + CGFloat(index) * weekDayWidth
+            AppTheme.Colors.amberSoft.setFill()
+            UIBezierPath(rect: CGRect(x: x, y: 0, width: weekDayWidth, height: bounds.height)).fill()
+        }
+
         context.setStrokeColor(AppTheme.Colors.border.cgColor)
         context.setLineWidth(0.75)
 
@@ -167,7 +299,7 @@ final class CalendarGridView: UIView {
         }
 
         for hour in 0...24 {
-            let y = headerHeight + CGFloat(hour) * hourRowHeight
+            let y = CGFloat(hour) * hourRowHeight
             context.move(to: CGPoint(x: 0, y: y))
             context.addLine(to: CGPoint(x: bounds.width, y: y))
         }
@@ -189,7 +321,7 @@ final class CalendarGridView: UIView {
             let x = timeColumnWidth + CGFloat(dayIndex) * weekDayWidth + 4
             let minuteOffset = CGFloat(task.time.minute) / 60 * hourRowHeight
             let hourIndex = orderedWeekHours.firstIndex(of: task.time.hour) ?? task.time.hour
-            let y = headerHeight + CGFloat(hourIndex) * hourRowHeight + minuteOffset + 4
+            let y = CGFloat(hourIndex) * hourRowHeight + minuteOffset + 4
             let durationHeight = max(CGFloat(task.effectiveDurationMinutes) / 60 * hourRowHeight - 8, 42)
             let frame = CGRect(x: x, y: y, width: weekDayWidth - 8, height: durationHeight)
 
@@ -198,25 +330,8 @@ final class CalendarGridView: UIView {
     }
 
     private func drawMonth(_ context: CGContext) {
-        drawMonthHeaders()
         drawMonthGrid(context)
         drawMonthTasks()
-    }
-
-    private func drawMonthHeaders() {
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 12, weight: .bold),
-            .foregroundColor: AppTheme.Colors.navy,
-            .paragraphStyle: centeredParagraph()
-        ]
-        let titles = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
-
-        for (index, title) in titles.enumerated() {
-            title.draw(
-                in: CGRect(x: CGFloat(index) * monthDayWidth, y: 11, width: monthDayWidth, height: 18),
-                withAttributes: attributes
-            )
-        }
     }
 
     private func drawMonthGrid(_ context: CGContext) {
@@ -230,7 +345,7 @@ final class CalendarGridView: UIView {
         }
 
         for row in 0...monthRowCount {
-            let y = monthHeaderHeight + CGFloat(row) * monthRowHeight
+            let y = CGFloat(row) * monthRowHeight
             context.move(to: CGPoint(x: 0, y: y))
             context.addLine(to: CGPoint(x: bounds.width, y: y))
         }
@@ -256,7 +371,7 @@ final class CalendarGridView: UIView {
             let column = cellIndex % 7
             let cellFrame = CGRect(
                 x: CGFloat(column) * monthDayWidth,
-                y: monthHeaderHeight + CGFloat(row) * monthRowHeight,
+                y: CGFloat(row) * monthRowHeight,
                 width: monthDayWidth,
                 height: monthRowHeight
             )

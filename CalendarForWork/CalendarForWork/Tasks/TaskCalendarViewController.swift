@@ -5,6 +5,8 @@ final class TaskCalendarViewController: UIViewController {
     private let summaryLabel = UILabel()
     private let viewModeControl = UISegmentedControl(items: ["Tuần", "Tháng"])
     private let statusBanner = StatusBannerView()
+    private let gridContainer = UIView()
+    private let gridHeaderView = CalendarGridHeaderView()
     private let scrollView = UIScrollView()
     private let gridView = CalendarGridView()
     private var calendar: Calendar = {
@@ -14,6 +16,7 @@ final class TaskCalendarViewController: UIViewController {
     }()
     private var gridWidthConstraint: NSLayoutConstraint?
     private var gridHeightConstraint: NSLayoutConstraint?
+    private var gridHeaderHeightConstraint: NSLayoutConstraint?
 
     private var visibleDate = Date()
     private var displayMode: CalendarDisplayMode = .week
@@ -70,15 +73,25 @@ final class TaskCalendarViewController: UIViewController {
 
         contentStack.addArrangedSubview(makeHeaderCard())
         contentStack.addArrangedSubview(statusBanner)
-        contentStack.addArrangedSubview(scrollView)
+        contentStack.addArrangedSubview(gridContainer)
+
+        gridContainer.backgroundColor = AppTheme.Colors.card
+        gridContainer.layer.cornerRadius = AppTheme.Radius.medium
+        gridContainer.layer.borderColor = AppTheme.Colors.border.cgColor
+        gridContainer.layer.borderWidth = 1
+        gridContainer.clipsToBounds = true
+
+        gridHeaderView.visibleDate = visibleDate
+        gridHeaderView.displayMode = displayMode
+        gridHeaderView.translatesAutoresizingMaskIntoConstraints = false
+        gridContainer.addSubview(gridHeaderView)
 
         scrollView.backgroundColor = AppTheme.Colors.card
-        scrollView.layer.cornerRadius = AppTheme.Radius.medium
-        scrollView.layer.borderColor = AppTheme.Colors.border.cgColor
-        scrollView.layer.borderWidth = 1
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.showsVerticalScrollIndicator = true
         scrollView.alwaysBounceHorizontal = false
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        gridContainer.addSubview(scrollView)
 
         gridView.visibleDate = visibleDate
         gridView.displayMode = displayMode
@@ -89,8 +102,17 @@ final class TaskCalendarViewController: UIViewController {
         let gridSize = gridView.intrinsicContentSize
         gridWidthConstraint = gridView.widthAnchor.constraint(equalToConstant: gridSize.width)
         gridHeightConstraint = gridView.heightAnchor.constraint(equalToConstant: gridSize.height)
+        gridHeaderHeightConstraint = gridHeaderView.heightAnchor.constraint(equalToConstant: gridHeaderView.intrinsicContentSize.height)
 
         NSLayoutConstraint.activate([
+            gridHeaderView.topAnchor.constraint(equalTo: gridContainer.topAnchor),
+            gridHeaderView.leadingAnchor.constraint(equalTo: gridContainer.leadingAnchor),
+            gridHeaderView.trailingAnchor.constraint(equalTo: gridContainer.trailingAnchor),
+            gridHeaderHeightConstraint!,
+            scrollView.topAnchor.constraint(equalTo: gridHeaderView.bottomAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: gridContainer.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: gridContainer.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: gridContainer.bottomAnchor),
             gridView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             gridView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
             gridView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
@@ -160,6 +182,8 @@ final class TaskCalendarViewController: UIViewController {
     }
 
     private func updateHeaderAndGrid() {
+        gridHeaderView.visibleDate = visibleDate
+        gridHeaderView.displayMode = displayMode
         gridView.visibleDate = visibleDate
         gridView.displayMode = displayMode
         gridView.tasks = tasks
@@ -177,10 +201,13 @@ final class TaskCalendarViewController: UIViewController {
     }
 
     private func updateGridSize() {
-        let availableWidth = scrollView.bounds.width > 0 ? scrollView.bounds.width : 320
+        let availableWidth = gridContainer.bounds.width > 0 ? gridContainer.bounds.width : 320
+        gridHeaderView.availableWidth = availableWidth
         gridView.availableWidth = availableWidth
+        gridHeaderHeightConstraint?.constant = gridHeaderView.intrinsicContentSize.height
         gridWidthConstraint?.constant = gridView.intrinsicContentSize.width
         gridHeightConstraint?.constant = gridView.intrinsicContentSize.height
+        gridHeaderView.setNeedsDisplay()
         gridView.setNeedsDisplay()
     }
 
