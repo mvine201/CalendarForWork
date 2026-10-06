@@ -26,11 +26,18 @@ enum APIClientError: LocalizedError {
 final class APIClient {
     static let shared = APIClient()
 
-    private let baseURL = URL(string: "http://localhost:3000")!
+    private let baseURL = URL(string: "https://calendarforwork.onrender.com")!
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
+    private let session: URLSession
 
-    private init() {}
+    private init() {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 60
+        config.waitsForConnectivity = true
+        self.session = URLSession(configuration: config)
+    }
 
     func register(_ request: RegisterRequest, completion: @escaping (Result<AuthResponse, Error>) -> Void) {
         perform(path: "/api/auth/register", method: "POST", body: request, requiresAuth: false, completion: completion)
@@ -93,7 +100,7 @@ final class APIClient {
             }
         }
 
-        URLSession.shared.dataTask(with: request) { [decoder] data, response, error in
+        session.dataTask(with: request) { [decoder] data, response, error in
             DispatchQueue.main.async {
                 if let error = error {
                     completion(.failure(error))
@@ -146,7 +153,7 @@ final class APIClient {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        session.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 if let error = error {
                     completion(.failure(error))
