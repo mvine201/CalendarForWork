@@ -12,6 +12,8 @@ enum AppCoordinator {
     }
 
     static func makeMainInterface() -> UIViewController {
+        LocalNotificationManager.shared.requestAuthorizationIfNeeded()
+
         let tabBarController = UITabBarController()
         tabBarController.tabBar.tintColor = AppTheme.Colors.amber
         tabBarController.tabBar.unselectedItemTintColor = AppTheme.Colors.textSecondary

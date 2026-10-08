@@ -26,5 +26,6 @@ final class SessionStore {
     func clear() {
         UserDefaults.standard.removeObject(forKey: tokenKey)
         UserDefaults.standard.removeObject(forKey: userEmailKey)
+        LocalNotificationManager.shared.clearAllNotifications()
     }
 }

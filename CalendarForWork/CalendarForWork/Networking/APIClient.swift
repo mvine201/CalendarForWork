@@ -52,19 +52,39 @@ final class APIClient {
     }
 
     func fetchTasks(completion: @escaping (Result<TaskListResponse, Error>) -> Void) {
-        perform(path: "/api/tasks", method: "GET", body: Optional<String>.none, requiresAuth: true, completion: completion)
+        perform(path: "/api/tasks", method: "GET", body: Optional<String>.none, requiresAuth: true) { result in
+            if case .success(let response) = result {
+                LocalNotificationManager.shared.syncNotifications(for: response.tasks)
+            }
+            completion(result)
+        }
     }
 
     func createTask(_ request: TaskMutationRequest, completion: @escaping (Result<TaskResponse, Error>) -> Void) {
-        perform(path: "/api/tasks", method: "POST", body: request, requiresAuth: true, completion: completion)
+        perform(path: "/api/tasks", method: "POST", body: request, requiresAuth: true) { result in
+            if case .success(let response) = result {
+                LocalNotificationManager.shared.scheduleNotifications(for: response.task)
+            }
+            completion(result)
+        }
     }
 
     func updateTask(id: String, request: TaskMutationRequest, completion: @escaping (Result<TaskResponse, Error>) -> Void) {
-        perform(path: "/api/tasks/\(id)", method: "PATCH", body: request, requiresAuth: true, completion: completion)
+        perform(path: "/api/tasks/\(id)", method: "PATCH", body: request, requiresAuth: true) { result in
+            if case .success(let response) = result {
+                LocalNotificationManager.shared.scheduleNotifications(for: response.task)
+            }
+            completion(result)
+        }
     }
 
     func deleteTask(id: String, completion: @escaping (Result<Void, Error>) -> Void) {
-        performVoid(path: "/api/tasks/\(id)", method: "DELETE", requiresAuth: true, completion: completion)
+        performVoid(path: "/api/tasks/\(id)", method: "DELETE", requiresAuth: true) { result in
+            if case .success = result {
+                LocalNotificationManager.shared.cancelNotifications(forTaskId: id)
+            }
+            completion(result)
+        }
     }
 
     private func perform<Request: Encodable, Response: Decodable>(
