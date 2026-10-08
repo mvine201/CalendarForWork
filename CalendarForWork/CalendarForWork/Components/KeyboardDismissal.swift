@@ -40,7 +40,7 @@ extension UIViewController {
         toolbar.sizeToFit()
         toolbar.items = [
             UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
-            UIBarButtonItem(title: "Xong", style: .done, target: self, action: selector)
+            UIBarButtonItem(title: "Xong", style: .prominent, target: self, action: selector)
         ]
         return toolbar
     }
